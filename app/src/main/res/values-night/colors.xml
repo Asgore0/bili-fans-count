@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_chip_text">#7FE5FF</color>
+    <color name="widget_primary_text">#F4FAFF</color>
+    <color name="widget_follower_text">#4BD9FF</color>
+    <color name="widget_secondary_text">#BED1DD</color>
+</resources>

@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+*.xcuserstate
+*.swp
+
+# Build artifacts
+build/
+app/build/
+outputs/
+*.apk
+*.aab
+*.dmg
+*.zip
+
+# Gradle
+.gradle/
+.gradle-user-home/
+.android/
+
+# Swift / Clang module caches
+.swift-module-cache/
+*.pcm
+
+# Generated macOS app binary/signature.
+# Keep Info.plist and Resources/AppIcon.icns tracked as source metadata.
+macos-card/BILIFansCard.app/Contents/MacOS/
+macos-card/BILIFansCard.app/Contents/_CodeSignature/
+macos-card/src/BILIFansCard.swift
+
+# Local-only special edition
+macos-card-special/
+
+# Local scratch
+*.log
+*.tmp
+*.bak

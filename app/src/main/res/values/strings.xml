@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BILI粉丝数</string>
+    <string name="widget_name">谐门东西</string>
+    <string name="widget_description">在桌面显示谐门东西的实时关注者数据</string>
+    <string name="widget_provider_overlay_label">&#8203;</string>
+    <string name="glance_card_description">尝试用于 HyperOS 和系统速览入口的实时关注者卡片</string>
+    <string name="widget_refresh_content_description">刷新</string>
+    <string name="widget_placeholder">--</string>
+    <string name="widget_status_realtime">实时统计</string>
+    <string name="widget_waiting">等待刷新</string>
+    <string name="main_uid_format">UID: %1$d</string>
+    <string name="main_apply_uid">应用 UID</string>
+    <string name="main_updated_format">更新时间: %1$s</string>
+    <string name="main_refresh_error_format">刷新失败: %1$s</string>
+</resources>

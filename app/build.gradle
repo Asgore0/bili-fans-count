@@ -1,0 +1,16 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.example.bupfans"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.example.bupfans"
+        minSdk 23
+        targetSdk 35
+        versionCode 16
+        versionName "2.5"
+    }
+}
