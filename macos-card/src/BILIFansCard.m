@@ -135,6 +135,43 @@ static BOOL AppAppearanceIsDark(void) {
     return [match isEqualToString:NSAppearanceNameDarkAqua];
 }
 
+static void SetTextFieldStringIfChanged(NSTextField *field, NSString *value) {
+    if (!field) return;
+    NSString *next = value ?: @"";
+    if (![field.stringValue isEqualToString:next]) {
+        field.stringValue = next;
+    }
+}
+
+static void SetTextFieldColorIfChanged(NSTextField *field, NSColor *color) {
+    if (!field || !color) return;
+    if (![field.textColor isEqual:color]) {
+        field.textColor = color;
+    }
+}
+
+static void SetButtonTitleIfChanged(NSButton *button, NSString *title) {
+    if (!button) return;
+    NSString *next = title ?: @"";
+    if (![button.title isEqualToString:next]) {
+        button.title = next;
+    }
+}
+
+static void SetViewToolTipIfChanged(NSView *view, NSString *toolTip) {
+    if (!view) return;
+    NSString *current = view.toolTip;
+    if ((current || toolTip) && ![current isEqualToString:toolTip]) {
+        view.toolTip = toolTip;
+    }
+}
+
+static NSColor *WindowChromeBackgroundColor(void) {
+    return AppAppearanceIsDark()
+        ? [NSColor colorWithCalibratedRed:0.060 green:0.066 blue:0.076 alpha:1.0]
+        : [NSColor colorWithCalibratedRed:0.965 green:0.972 blue:0.982 alpha:1.0];
+}
+
 static BOOL SystemPrefersReducedTransparency(void) {
     return NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency;
 }
@@ -159,17 +196,17 @@ static void DrawLiquidGlassRim(NSRect rect, CGFloat radius, NSColor *accent, CGF
 
     NSGradient *topSheen = [[NSGradient alloc] initWithColors:@[
         [[NSColor whiteColor] colorWithAlphaComponent:(dark ? 0.118 : 0.28) * clamped],
-        [[NSColor whiteColor] colorWithAlphaComponent:(dark ? 0.030 : 0.082) * clamped],
+        [[NSColor whiteColor] colorWithAlphaComponent:(dark ? 0.044 : 0.104) * clamped],
         [[NSColor whiteColor] colorWithAlphaComponent:0.0]
     ]];
-    [topSheen drawInRect:NSMakeRect(NSMinX(rect), NSMaxY(rect) - rect.size.height * 0.46, rect.size.width, rect.size.height * 0.46) angle:90];
+    [topSheen drawInRect:rect angle:90];
 
     NSGradient *lowerDepth = [[NSGradient alloc] initWithColors:@[
         [[NSColor blackColor] colorWithAlphaComponent:0.0],
-        [[NSColor blackColor] colorWithAlphaComponent:(dark ? 0.024 : 0.024) * clamped],
-        [[NSColor blackColor] colorWithAlphaComponent:(dark ? 0.046 : 0.052) * clamped]
+        [[NSColor blackColor] colorWithAlphaComponent:(dark ? 0.016 : 0.018) * clamped],
+        [[NSColor blackColor] colorWithAlphaComponent:(dark ? 0.038 : 0.044) * clamped]
     ]];
-    [lowerDepth drawInRect:NSMakeRect(NSMinX(rect), NSMinY(rect), rect.size.width, rect.size.height * 0.58) angle:-90];
+    [lowerDepth drawInRect:rect angle:-90];
 
     CGFloat edgeWidth = MIN(30.0, rect.size.width * 0.14);
     NSGradient *leftRefraction = [[NSGradient alloc] initWithColors:@[
@@ -232,36 +269,30 @@ static CGFloat LiquidGlassAlphaForMode(NSInteger mode, CGFloat readable, CGFloat
     return ultraClear;
 }
 
-static void DrawCompactBMark(NSRect rect, NSColor *color, CGFloat lineWidth) {
+static NSFont *RoundedBFont(CGFloat size) {
+    NSFont *base = [NSFont systemFontOfSize:size weight:NSFontWeightHeavy];
+    if (@available(macOS 10.15, *)) {
+        NSFontDescriptor *rounded = [base.fontDescriptor fontDescriptorWithDesign:NSFontDescriptorSystemDesignRounded];
+        NSFont *font = rounded ? [NSFont fontWithDescriptor:rounded size:size] : nil;
+        if (font) {
+            return font;
+        }
+    }
+    return base;
+}
+
+static void DrawBilibiliBLetter(NSRect rect, NSColor *color) {
     if (rect.size.width <= 0 || rect.size.height <= 0) {
         return;
     }
-    CGFloat x = NSMinX(rect);
-    CGFloat y = NSMinY(rect);
-    CGFloat w = rect.size.width;
-    CGFloat h = rect.size.height;
-    CGFloat stemX = x + w * 0.28;
-    CGFloat topY = y + h * 0.88;
-    CGFloat midY = y + h * 0.51;
-    CGFloat bottomY = y + h * 0.12;
-    CGFloat rightX = x + w * 0.84;
-
-    NSBezierPath *mark = [NSBezierPath bezierPath];
-    mark.lineWidth = lineWidth;
-    mark.lineCapStyle = NSLineCapStyleRound;
-    mark.lineJoinStyle = NSLineJoinStyleRound;
-    [mark moveToPoint:NSMakePoint(stemX, bottomY)];
-    [mark lineToPoint:NSMakePoint(stemX, topY)];
-    [mark moveToPoint:NSMakePoint(stemX, topY)];
-    [mark curveToPoint:NSMakePoint(stemX, midY + h * 0.03)
-         controlPoint1:NSMakePoint(rightX, topY)
-         controlPoint2:NSMakePoint(rightX, midY + h * 0.08)];
-    [mark moveToPoint:NSMakePoint(stemX, midY - h * 0.02)];
-    [mark curveToPoint:NSMakePoint(stemX, bottomY)
-         controlPoint1:NSMakePoint(x + w * 0.92, midY - h * 0.08)
-         controlPoint2:NSMakePoint(x + w * 0.92, bottomY)];
-    [color setStroke];
-    [mark stroke];
+    NSString *letter = @"B";
+    NSFont *font = RoundedBFont(rect.size.height * 1.02);
+    NSDictionary *attrs = @{NSFontAttributeName: font,
+                            NSForegroundColorAttributeName: color};
+    NSSize size = [letter sizeWithAttributes:attrs];
+    CGFloat x = NSMidX(rect) - size.width / 2.0 - rect.size.width * 0.015;
+    CGFloat y = NSMidY(rect) - size.height / 2.0 - rect.size.height * 0.035;
+    [letter drawAtPoint:NSMakePoint(x, y) withAttributes:attrs];
 }
 
 static void DrawFloatingGlassShadow(NSRect rect, CGFloat radius, NSInteger appearanceMode, CGFloat strength) {
@@ -362,6 +393,150 @@ static void DrawLiquidGlassControlWell(NSRect rect, CGFloat radius, NSColor *acc
     BOOL dark = AppAppearanceIsDark();
     DrawLiquidGlassBackdrop(rect, radius, accent, appearanceMode, emphasized ? (dark ? 0.82 : 0.78) : (dark ? 0.42 : 0.54));
     DrawLiquidGlassRim(rect, radius, accent, emphasized ? (dark ? 0.46 : 0.44) : (dark ? 0.18 : 0.28));
+}
+
+static void DrawStatusPopoverGlassBackdrop(NSRect rect, CGFloat radius, NSInteger appearanceMode) {
+    BOOL dark = AppAppearanceIsDark();
+    NSInteger effectiveMode = EffectiveAppearanceMode(appearanceMode);
+    BOOL readable = effectiveMode == AppearanceModeReadable;
+    BOOL clear = effectiveMode == AppearanceModeClear;
+    NSBezierPath *shape = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:radius yRadius:radius];
+
+    [NSGraphicsContext saveGraphicsState];
+    [shape addClip];
+
+    if (dark) {
+        CGFloat density = readable ? 0.58 : (clear ? 0.42 : 0.31);
+        NSGradient *wash = [[NSGradient alloc] initWithColors:@[
+            [NSColor colorWithCalibratedRed:0.110 green:0.125 blue:0.150 alpha:density * 0.72],
+            [NSColor colorWithCalibratedRed:0.055 green:0.064 blue:0.080 alpha:density * 0.66],
+            [NSColor colorWithCalibratedRed:0.025 green:0.030 blue:0.038 alpha:density * 0.74]
+        ]];
+        [wash drawInRect:rect angle:-24];
+
+        NSGradient *topBloom = [[NSGradient alloc] initWithColors:@[
+            [[NSColor whiteColor] colorWithAlphaComponent:(readable ? 0.118 : (clear ? 0.090 : 0.066))],
+            [[NSColor whiteColor] colorWithAlphaComponent:(readable ? 0.044 : (clear ? 0.034 : 0.024))],
+            [[NSColor whiteColor] colorWithAlphaComponent:0.0]
+        ]];
+        [topBloom drawInRect:rect angle:90];
+
+        NSGradient *floorShade = [[NSGradient alloc] initWithColors:@[
+            [[NSColor blackColor] colorWithAlphaComponent:0.0],
+            [[NSColor blackColor] colorWithAlphaComponent:(readable ? 0.020 : (clear ? 0.014 : 0.010))],
+            [[NSColor blackColor] colorWithAlphaComponent:(readable ? 0.110 : (clear ? 0.082 : 0.060))]
+        ]];
+        [floorShade drawInRect:rect angle:-90];
+
+        NSBezierPath *leftLens = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(NSMinX(rect) - rect.size.width * 0.28,
+                                                                                    NSMaxY(rect) - rect.size.height * 0.62,
+                                                                                    rect.size.width * 0.70,
+                                                                                    rect.size.height * 0.80)];
+        NSGradient *leftGlow = [[NSGradient alloc] initWithStartingColor:[[NSColor whiteColor] colorWithAlphaComponent:(readable ? 0.050 : (clear ? 0.036 : 0.026))]
+                                                             endingColor:[[NSColor whiteColor] colorWithAlphaComponent:0.0]];
+        [leftGlow drawInBezierPath:leftLens relativeCenterPosition:NSMakePoint(-0.20, 0.16)];
+    } else {
+        CGFloat density = readable ? 0.46 : (clear ? 0.22 : 0.12);
+        NSGradient *wash = [[NSGradient alloc] initWithColors:@[
+            [[NSColor whiteColor] colorWithAlphaComponent:density * 0.62],
+            [[NSColor windowBackgroundColor] colorWithAlphaComponent:density * 0.34],
+            [[NSColor controlBackgroundColor] colorWithAlphaComponent:density * 0.22]
+        ]];
+        [wash drawInRect:rect angle:-24];
+
+        NSGradient *topBloom = [[NSGradient alloc] initWithStartingColor:[[NSColor whiteColor] colorWithAlphaComponent:(readable ? 0.32 : (clear ? 0.20 : 0.13))]
+                                                             endingColor:[[NSColor whiteColor] colorWithAlphaComponent:0.0]];
+        [topBloom drawInRect:rect angle:90];
+    }
+
+    [NSGraphicsContext restoreGraphicsState];
+}
+
+static void DrawStatusPopoverGlassRim(NSRect rect, CGFloat radius, NSInteger appearanceMode) {
+    NSInteger effectiveMode = EffectiveAppearanceMode(appearanceMode);
+    BOOL dark = AppAppearanceIsDark();
+    BOOL readable = effectiveMode == AppearanceModeReadable;
+    BOOL clear = effectiveMode == AppearanceModeClear;
+    CGFloat edgeAlpha = dark
+        ? (readable ? 0.28 : (clear ? 0.22 : 0.18))
+        : (readable ? 0.34 : (clear ? 0.28 : 0.22));
+    CGFloat innerAlpha = dark
+        ? (readable ? 0.16 : (clear ? 0.13 : 0.10))
+        : (readable ? 0.42 : (clear ? 0.34 : 0.27));
+
+    NSBezierPath *outer = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(rect, 0.45, 0.45)
+                                                          xRadius:MAX(2, radius - 0.45)
+                                                          yRadius:MAX(2, radius - 0.45)];
+    [[[NSColor whiteColor] colorWithAlphaComponent:edgeAlpha] setStroke];
+    outer.lineWidth = 0.85;
+    [outer stroke];
+
+    NSBezierPath *inner = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(rect, 1.4, 1.4)
+                                                          xRadius:MAX(2, radius - 1.4)
+                                                          yRadius:MAX(2, radius - 1.4)];
+    [[[NSColor whiteColor] colorWithAlphaComponent:innerAlpha] setStroke];
+    inner.lineWidth = 0.60;
+    [inner stroke];
+
+    if (dark) {
+        NSBezierPath *depth = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(rect, 2.2, 2.2)
+                                                              xRadius:MAX(2, radius - 2.2)
+                                                              yRadius:MAX(2, radius - 2.2)];
+        [[[NSColor blackColor] colorWithAlphaComponent:clear ? 0.18 : 0.13] setStroke];
+        depth.lineWidth = 0.55;
+        [depth stroke];
+    }
+}
+
+static void DrawStatusPopoverGlassControl(NSRect rect, CGFloat radius, NSColor *accent, NSInteger appearanceMode, BOOL emphasized) {
+    BOOL dark = AppAppearanceIsDark();
+    NSInteger effectiveMode = EffectiveAppearanceMode(appearanceMode);
+    BOOL readable = effectiveMode == AppearanceModeReadable;
+    BOOL clear = effectiveMode == AppearanceModeClear;
+    NSBezierPath *shape = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:radius yRadius:radius];
+
+    [NSGraphicsContext saveGraphicsState];
+    [shape addClip];
+
+    if (dark) {
+        CGFloat baseAlpha = emphasized
+            ? (readable ? 0.160 : (clear ? 0.130 : 0.102))
+            : (readable ? 0.090 : (clear ? 0.062 : 0.044));
+        NSColor *base = emphasized ? accent : NSColor.whiteColor;
+        [[base colorWithAlphaComponent:baseAlpha] setFill];
+        [shape fill];
+
+        NSGradient *sheen = [[NSGradient alloc] initWithColors:@[
+            [[NSColor whiteColor] colorWithAlphaComponent:(emphasized ? 0.105 : 0.070)],
+            [[NSColor whiteColor] colorWithAlphaComponent:(emphasized ? 0.026 : 0.016)],
+            [[NSColor whiteColor] colorWithAlphaComponent:0.0]
+        ]];
+        [sheen drawInRect:NSMakeRect(NSMinX(rect), NSMaxY(rect) - rect.size.height * 0.58, rect.size.width, rect.size.height * 0.58) angle:90];
+
+        NSGradient *depth = [[NSGradient alloc] initWithStartingColor:[[NSColor blackColor] colorWithAlphaComponent:0.0]
+                                                          endingColor:[[NSColor blackColor] colorWithAlphaComponent:(emphasized ? 0.105 : 0.070)]];
+        [depth drawInRect:NSMakeRect(NSMinX(rect), NSMinY(rect), rect.size.width, rect.size.height * 0.48) angle:-90];
+    } else {
+        CGFloat baseAlpha = emphasized
+            ? (readable ? 0.190 : (clear ? 0.142 : 0.100))
+            : (readable ? 0.170 : (clear ? 0.102 : 0.066));
+        NSColor *base = emphasized ? accent : NSColor.whiteColor;
+        [[base colorWithAlphaComponent:baseAlpha] setFill];
+        [shape fill];
+
+        NSGradient *sheen = [[NSGradient alloc] initWithStartingColor:[[NSColor whiteColor] colorWithAlphaComponent:(emphasized ? 0.30 : 0.22)]
+                                                          endingColor:[[NSColor whiteColor] colorWithAlphaComponent:0.0]];
+        [sheen drawInRect:NSMakeRect(NSMinX(rect), NSMaxY(rect) - rect.size.height * 0.60, rect.size.width, rect.size.height * 0.60) angle:90];
+    }
+
+    [NSGraphicsContext restoreGraphicsState];
+
+    CGFloat strokeAlpha = dark
+        ? (emphasized ? 0.200 : (readable ? 0.130 : 0.095))
+        : (emphasized ? 0.240 : (readable ? 0.190 : 0.135));
+    [[[NSColor whiteColor] colorWithAlphaComponent:strokeAlpha] setStroke];
+    shape.lineWidth = 0.65;
+    [shape stroke];
 }
 
 static NSString *RefreshErrorText(NSError *error) {
@@ -506,6 +681,22 @@ static BOOL HistoryPointIsUsable(id point) {
     return [entry[@"updated_at"] doubleValue] > 0;
 }
 
+static NSDateFormatter *ThreadLocalDateFormatterWithLocale(NSString *key, NSString *format, NSString *localeIdentifier) {
+    NSMutableDictionary *threadDictionary = NSThread.currentThread.threadDictionary;
+    NSDateFormatter *formatter = threadDictionary[key];
+    if (!formatter) {
+        formatter = [NSDateFormatter new];
+        formatter.locale = [NSLocale localeWithLocaleIdentifier:localeIdentifier ?: @"en_US_POSIX"];
+        formatter.dateFormat = format;
+        threadDictionary[key] = formatter;
+    }
+    return formatter;
+}
+
+static NSDateFormatter *ThreadLocalDateFormatter(NSString *key, NSString *format) {
+    return ThreadLocalDateFormatterWithLocale(key, format, @"en_US_POSIX");
+}
+
 static NSArray<NSDictionary *> *SortedUsableHistoryPoints(NSArray<NSDictionary *> *history) {
     NSMutableArray<NSDictionary *> *usable = [NSMutableArray new];
     for (id point in history ?: @[]) {
@@ -523,11 +714,12 @@ static NSArray<NSDictionary *> *SortedUsableHistoryPoints(NSArray<NSDictionary *
     return usable.copy;
 }
 
-static NSArray<NSDictionary *> *TrendHistoryIncludingBaseline(NSArray<NSDictionary *> *history, NSTimeInterval cutoff) {
-    NSArray<NSDictionary *> *points = SortedUsableHistoryPoints(history);
+static NSArray<NSDictionary *> *TrendHistoryIncludingBaselineFromSortedPoints(NSArray<NSDictionary *> *points, NSTimeInterval cutoff) {
     NSDictionary *baseline = nil;
     NSMutableArray<NSDictionary *> *inRange = [NSMutableArray new];
-    for (NSDictionary *point in points) {
+    for (id candidate in points ?: @[]) {
+        if (!HistoryPointIsUsable(candidate)) continue;
+        NSDictionary *point = candidate;
         NSTimeInterval updatedAt = [point[@"updated_at"] doubleValue];
         if (updatedAt < cutoff) {
             baseline = point;
@@ -544,6 +736,10 @@ static NSArray<NSDictionary *> *TrendHistoryIncludingBaseline(NSArray<NSDictiona
     return inRange.copy;
 }
 
+__attribute__((unused)) static NSArray<NSDictionary *> *TrendHistoryIncludingBaseline(NSArray<NSDictionary *> *history, NSTimeInterval cutoff) {
+    return TrendHistoryIncludingBaselineFromSortedPoints(SortedUsableHistoryPoints(history), cutoff);
+}
+
 static NSUInteger HistoryPointCountAtOrAfterCutoff(NSArray<NSDictionary *> *history, NSTimeInterval cutoff) {
     NSUInteger count = 0;
     for (id point in history ?: @[]) {
@@ -554,10 +750,11 @@ static NSUInteger HistoryPointCountAtOrAfterCutoff(NSArray<NSDictionary *> *hist
     return count;
 }
 
-static NSArray<NSDictionary *> *HistoryPointsAtOrAfterCutoff(NSArray<NSDictionary *> *history, NSTimeInterval cutoff) {
-    NSArray<NSDictionary *> *points = SortedUsableHistoryPoints(history);
+static NSArray<NSDictionary *> *HistoryPointsAtOrAfterCutoffFromSortedPoints(NSArray<NSDictionary *> *points, NSTimeInterval cutoff) {
     NSMutableArray<NSDictionary *> *filtered = [NSMutableArray new];
-    for (NSDictionary *point in points) {
+    for (id candidate in points ?: @[]) {
+        if (!HistoryPointIsUsable(candidate)) continue;
+        NSDictionary *point = candidate;
         if ([point[@"updated_at"] doubleValue] >= cutoff) {
             [filtered addObject:point];
         }
@@ -565,10 +762,12 @@ static NSArray<NSDictionary *> *HistoryPointsAtOrAfterCutoff(NSArray<NSDictionar
     return filtered.copy;
 }
 
+__attribute__((unused)) static NSArray<NSDictionary *> *HistoryPointsAtOrAfterCutoff(NSArray<NSDictionary *> *history, NSTimeInterval cutoff) {
+    return HistoryPointsAtOrAfterCutoffFromSortedPoints(SortedUsableHistoryPoints(history), cutoff);
+}
+
 static NSString *CSVStringForHistoryPoints(NSArray<NSDictionary *> *points, BOOL includeScopeColumn, NSTimeInterval cutoff) {
-    NSDateFormatter *csvFormatter = [NSDateFormatter new];
-    csvFormatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    csvFormatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    NSDateFormatter *csvFormatter = ThreadLocalDateFormatter(@"BILIFansCSVDateFormatter", @"yyyy-MM-dd HH:mm:ss");
 
     NSMutableString *csv = [NSMutableString stringWithString:includeScopeColumn ? @"time,uid,followers,scope\n" : @"time,uid,followers\n"];
     for (NSDictionary *point in points ?: @[]) {
@@ -593,9 +792,7 @@ static NSString *CSVStringForHistoryPoints(NSArray<NSDictionary *> *points, BOOL
 }
 
 static NSString *HistoryCSVPeriodIdentifierForDate(NSDate *date) {
-    NSDateFormatter *formatter = [NSDateFormatter new];
-    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    formatter.dateFormat = @"yyyy-MM";
+    NSDateFormatter *formatter = ThreadLocalDateFormatter(@"BILIFansCSVPeriodFormatter", @"yyyy-MM");
     return [formatter stringFromDate:date ?: NSDate.date];
 }
 
@@ -650,9 +847,7 @@ static NSURL *HistoryCSVFileURLForMIDAndDate(long long mid, NSDate *date, BOOL c
 
 static NSString *CSVLineForHistoryPoint(NSDictionary *point) {
     if (!HistoryPointIsUsable(point)) return @"";
-    NSDateFormatter *csvFormatter = [NSDateFormatter new];
-    csvFormatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    csvFormatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    NSDateFormatter *csvFormatter = ThreadLocalDateFormatter(@"BILIFansCSVDateFormatter", @"yyyy-MM-dd HH:mm:ss");
     NSTimeInterval updatedAt = [point[@"updated_at"] doubleValue];
     NSDate *date = [NSDate dateWithTimeIntervalSince1970:updatedAt];
     return [NSString stringWithFormat:@"%@,%lld,%ld\n",
@@ -711,6 +906,7 @@ static void FlushUserSettings(void) {
 @implementation Settings
 static long long sCachedHistoryMID = 0;
 static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
+static NSMutableSet<NSNumber *> *sBackfilledHistoryCSVMIDs = nil;
 
 + (void)invalidateHistoryCache {
     sCachedHistoryMID = 0;
@@ -973,6 +1169,14 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 + (void)backfillSegmentedHistoryCSVIfNeededForMID:(long long)mid history:(NSArray<NSDictionary *> *)history {
     if (mid <= 0 || history.count == 0) return;
 
+    NSNumber *midNumber = @(mid);
+    if (!sBackfilledHistoryCSVMIDs) {
+        sBackfilledHistoryCSVMIDs = [NSMutableSet new];
+    }
+    if ([sBackfilledHistoryCSVMIDs containsObject:midNumber]) {
+        return;
+    }
+
     NSFileManager *fileManager = NSFileManager.defaultManager;
     NSURL *directoryURL = HistoryCSVDirectoryURLForMID(mid, NO);
     BOOL isDirectory = NO;
@@ -993,7 +1197,10 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
             }
         }
     }
-    if (hasCSV) return;
+    if (hasCSV) {
+        [sBackfilledHistoryCSVMIDs addObject:midNumber];
+        return;
+    }
 
     NSMutableDictionary<NSString *, NSMutableString *> *payloads = [NSMutableDictionary new];
     for (NSDictionary *point in SortedUsableHistoryPoints(history)) {
@@ -1008,9 +1215,13 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         [payload appendString:CSVLineForHistoryPoint(point)];
     }
 
-    if (payloads.count == 0) return;
+    if (payloads.count == 0) {
+        [sBackfilledHistoryCSVMIDs addObject:midNumber];
+        return;
+    }
     NSURL *targetDirectoryURL = HistoryCSVDirectoryURLForMID(mid, YES);
     if (!targetDirectoryURL) return;
+    BOOL wroteAllPayloads = YES;
     for (NSString *period in payloads) {
         NSURL *fileURL = [targetDirectoryURL URLByAppendingPathComponent:[period stringByAppendingString:@".csv"]
                                                               isDirectory:NO];
@@ -1020,7 +1231,11 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
                                  encoding:NSUTF8StringEncoding
                                     error:&writeError]) {
             NSLog(@"BILI粉丝数：回填历史 CSV 失败：%@", writeError.localizedDescription);
+            wroteAllPayloads = NO;
         }
+    }
+    if (wroteAllPayloads) {
+        [sBackfilledHistoryCSVMIDs addObject:midNumber];
     }
 }
 + (void)appendSegmentedHistoryCSVPoint:(NSDictionary *)point {
@@ -1133,6 +1348,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     FlushUserSettings();
 }
 + (void)clearSegmentedHistoryCSVForMID:(long long)mid {
+    [sBackfilledHistoryCSVMIDs removeObject:@(mid)];
     NSURL *directoryURL = HistoryCSVDirectoryURLForMID(mid, NO);
     if (!directoryURL || ![NSFileManager.defaultManager fileExistsAtPath:directoryURL.path]) return;
     NSError *error = nil;
@@ -2153,6 +2369,119 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 
 @end
 
+@interface StatusGlassSegmentedControl : NSSegmentedControl
+@property(nonatomic) NSInteger appearanceMode;
+@end
+
+@implementation StatusGlassSegmentedControl
+
+- (BOOL)isFlipped {
+    return NO;
+}
+
+- (void)setAppearanceMode:(NSInteger)appearanceMode {
+    NSInteger normalized = appearanceMode == AppearanceModeReadable
+        ? AppearanceModeReadable
+        : (appearanceMode == AppearanceModeClear ? AppearanceModeClear : AppearanceModeUltraClear);
+    if (_appearanceMode == normalized) return;
+    _appearanceMode = normalized;
+    self.needsDisplay = YES;
+}
+
+- (void)setSelectedSegment:(NSInteger)selectedSegment {
+    [super setSelectedSegment:selectedSegment];
+    for (NSInteger i = 0; i < self.segmentCount; i++) {
+        [self setSelected:(i == selectedSegment) forSegment:i];
+    }
+    self.needsDisplay = YES;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    (void)dirtyRect;
+    BOOL dark = AppAppearanceIsDark();
+    NSInteger effectiveMode = EffectiveAppearanceMode(self.appearanceMode);
+    BOOL readable = effectiveMode == AppearanceModeReadable;
+    BOOL clear = effectiveMode == AppearanceModeClear;
+    CGFloat alpha = self.enabled ? 1.0 : 0.42;
+    NSRect bounds = NSInsetRect(self.bounds, 0.5, 0.5);
+    CGFloat radius = MIN(11.0, bounds.size.height / 2.0);
+    NSBezierPath *clip = [NSBezierPath bezierPathWithRoundedRect:bounds xRadius:radius yRadius:radius];
+
+    [NSGraphicsContext saveGraphicsState];
+    [clip addClip];
+
+    CGFloat baseAlpha = dark
+        ? (readable ? 0.116 : (clear ? 0.086 : 0.058))
+        : (readable ? 0.176 : (clear ? 0.112 : 0.074));
+    NSGradient *base = dark
+        ? [[NSGradient alloc] initWithColors:@[
+            [NSColor colorWithCalibratedRed:0.28 green:0.32 blue:0.39 alpha:baseAlpha * 0.80 * alpha],
+            [NSColor colorWithCalibratedRed:0.11 green:0.13 blue:0.16 alpha:baseAlpha * 0.74 * alpha],
+            [NSColor colorWithCalibratedRed:0.05 green:0.06 blue:0.08 alpha:baseAlpha * alpha]
+        ]]
+        : [[NSGradient alloc] initWithColors:@[
+            [[NSColor whiteColor] colorWithAlphaComponent:baseAlpha * 1.30 * alpha],
+            [[NSColor controlBackgroundColor] colorWithAlphaComponent:baseAlpha * 0.88 * alpha],
+            [[NSColor windowBackgroundColor] colorWithAlphaComponent:baseAlpha * 0.68 * alpha]
+        ]];
+    [base drawInRect:bounds angle:-18];
+
+    NSInteger selected = self.selectedSegment;
+    if (selected >= 0 && selected < self.segmentCount) {
+        CGFloat segmentWidth = bounds.size.width / MAX(1, self.segmentCount);
+        NSRect selectedRect = NSMakeRect(NSMinX(bounds) + segmentWidth * selected + 1.5,
+                                         NSMinY(bounds) + 1.5,
+                                         segmentWidth - 3.0,
+                                         bounds.size.height - 3.0);
+        NSBezierPath *selectedPath = [NSBezierPath bezierPathWithRoundedRect:selectedRect
+                                                                     xRadius:MAX(7.0, radius - 2.0)
+                                                                     yRadius:MAX(7.0, radius - 2.0)];
+        NSGradient *selectedFill = [[NSGradient alloc] initWithColors:@[
+            [[NSColor controlAccentColor] colorWithAlphaComponent:(dark ? 0.94 : 0.88) * alpha],
+            [[NSColor controlAccentColor] colorWithAlphaComponent:(dark ? 0.78 : 0.72) * alpha]
+        ]];
+        [selectedFill drawInBezierPath:selectedPath angle:90];
+        [[[NSColor whiteColor] colorWithAlphaComponent:(dark ? 0.22 : 0.32) * alpha] setStroke];
+        selectedPath.lineWidth = 0.55;
+        [selectedPath stroke];
+    }
+
+    CGFloat separatorAlpha = dark ? 0.20 : 0.22;
+    for (NSInteger i = 1; i < self.segmentCount; i++) {
+        if (i == selected || i == selected + 1) continue;
+        CGFloat x = NSMinX(bounds) + bounds.size.width * (CGFloat)i / MAX(1, self.segmentCount);
+        NSBezierPath *line = [NSBezierPath bezierPath];
+        line.lineWidth = 0.6;
+        [line moveToPoint:NSMakePoint(x, NSMinY(bounds) + 6)];
+        [line lineToPoint:NSMakePoint(x, NSMaxY(bounds) - 6)];
+        [[[NSColor whiteColor] colorWithAlphaComponent:separatorAlpha * alpha] setStroke];
+        [line stroke];
+    }
+
+    [NSGraphicsContext restoreGraphicsState];
+
+    [[[NSColor whiteColor] colorWithAlphaComponent:(dark ? 0.18 : 0.32) * alpha] setStroke];
+    clip.lineWidth = 0.7;
+    [clip stroke];
+
+    for (NSInteger i = 0; i < self.segmentCount; i++) {
+        NSString *label = [self labelForSegment:i] ?: @"";
+        BOOL segmentSelected = i == selected;
+        NSColor *textColor = segmentSelected
+            ? NSColor.alternateSelectedControlTextColor
+            : (dark ? [[NSColor whiteColor] colorWithAlphaComponent:0.86 * alpha] : [[NSColor blackColor] colorWithAlphaComponent:0.72 * alpha]);
+        NSDictionary *attrs = @{NSFontAttributeName: self.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+                                NSForegroundColorAttributeName: textColor};
+        NSSize size = [label sizeWithAttributes:attrs];
+        CGFloat segmentWidth = bounds.size.width / MAX(1, self.segmentCount);
+        CGFloat x = NSMinX(bounds) + segmentWidth * i + (segmentWidth - size.width) / 2.0;
+        CGFloat y = NSMidY(bounds) - size.height / 2.0 + 0.5;
+        [label drawAtPoint:NSMakePoint(x, y) withAttributes:attrs];
+    }
+}
+
+@end
+
 @interface StatusPopoverView : NSView
 @property(nonatomic, copy) NSString *name;
 @property(nonatomic) NSInteger followers;
@@ -2245,7 +2574,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     _showCardButton = [self iconButton:@"macwindow" tooltip:@"显示主窗口" action:@selector(showCardTapped:)];
     _quitButton = [self iconButton:@"power" tooltip:@"退出" action:@selector(quitTapped:)];
     _quitButton.contentTintColor = NSColor.systemRedColor;
-    _appearanceControl = [[NSSegmentedControl alloc] initWithFrame:NSZeroRect];
+    _appearanceControl = [[StatusGlassSegmentedControl alloc] initWithFrame:NSZeroRect];
     _appearanceControl.segmentCount = 3;
     [_appearanceControl setLabel:@"极透" forSegment:0];
     [_appearanceControl setLabel:@"清透" forSegment:1];
@@ -2256,7 +2585,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     _appearanceControl.toolTip = @"玻璃外观";
     [self styleGlassSegmentedControl:_appearanceControl];
 
-    _statusDisplayControl = [[NSSegmentedControl alloc] initWithFrame:NSZeroRect];
+    _statusDisplayControl = [[StatusGlassSegmentedControl alloc] initWithFrame:NSZeroRect];
     _statusDisplayControl.segmentCount = 3;
     [_statusDisplayControl setLabel:@"精确" forSegment:0];
     [_statusDisplayControl setLabel:@"紧凑" forSegment:1];
@@ -2267,7 +2596,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     _statusDisplayControl.toolTip = @"顶栏显示方式";
     [self styleGlassSegmentedControl:_statusDisplayControl];
 
-    _intervalControl = [[NSSegmentedControl alloc] initWithFrame:NSZeroRect];
+    _intervalControl = [[StatusGlassSegmentedControl alloc] initWithFrame:NSZeroRect];
     _intervalControl.segmentCount = 3;
     [_intervalControl setLabel:@"1m" forSegment:0];
     [_intervalControl setLabel:@"5m" forSegment:1];
@@ -2525,21 +2854,22 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         _appearanceMode = AppearanceModeUltraClear;
         _appearanceControl.selectedSegment = 0;
     }
+    for (NSSegmentedControl *control in @[_appearanceControl, _statusDisplayControl, _intervalControl]) {
+        if ([control isKindOfClass:StatusGlassSegmentedControl.class]) {
+            ((StatusGlassSegmentedControl *)control).appearanceMode = _appearanceMode;
+        }
+    }
     if (changed) self.needsDisplay = YES;
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
     [super drawRect:dirtyRect];
     NSRect rect = NSInsetRect(self.bounds, 3, 3);
-    NSBezierPath *shape = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:20 yRadius:20];
     NSInteger effectiveMode = EffectiveAppearanceMode(self.appearanceMode);
     BOOL readable = effectiveMode == AppearanceModeReadable;
-    [NSGraphicsContext saveGraphicsState];
-    [shape addClip];
-    DrawLiquidGlassBackdrop(rect, 20, NSColor.controlAccentColor, self.appearanceMode, readable ? 0.92 : 0.86);
-    [NSGraphicsContext restoreGraphicsState];
-
-    DrawLiquidGlassRim(rect, 20, NSColor.controlAccentColor, readable ? 0.68 : (effectiveMode == AppearanceModeClear ? 0.54 : 0.46));
+    DrawFloatingGlassShadow(rect, 20, self.appearanceMode, readable ? 0.92 : 0.78);
+    DrawStatusPopoverGlassBackdrop(rect, 20, self.appearanceMode);
+    DrawStatusPopoverGlassRim(rect, 20, self.appearanceMode);
 
     [self drawHeader];
     [self drawFollowerNumber];
@@ -2569,7 +2899,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
             : (self.refreshScheduleText.length > 0 ? self.refreshScheduleText : @"仅顶栏");
         NSSize size = [badge sizeWithAttributes:badgeAttrs];
         NSRect badgeRect = NSMakeRect(self.bounds.size.width - size.width - 30, headerCenterY - 10.0, size.width + 14, 20);
-        DrawLiquidGlassControlWell(badgeRect, 10, NSColor.controlAccentColor, self.appearanceMode, NO);
+        DrawStatusPopoverGlassControl(badgeRect, 10, NSColor.controlAccentColor, self.appearanceMode, NO);
         [badge drawAtPoint:NSMakePoint(NSMinX(badgeRect) + 7, headerCenterY - size.height / 2.0) withAttributes:badgeAttrs];
     }
 }
@@ -2583,9 +2913,8 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     [[[NSColor separatorColor] colorWithAlphaComponent:0.28] setStroke];
     shape.lineWidth = 0.75;
     [shape stroke];
-    DrawCompactBMark(NSMakeRect(point.x + 5.2, point.y + 3.2, 9.2, 10.8),
-                     NSColor.alternateSelectedControlTextColor,
-                     1.75);
+    DrawBilibiliBLetter(NSMakeRect(point.x + 4.2, point.y + 2.0, 11.6, 13.0),
+                        NSColor.alternateSelectedControlTextColor);
 }
 
 - (void)drawFollowerNumber {
@@ -2683,37 +3012,18 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 
 - (void)drawActionBackplates {
     NSArray<NSButton *> *buttons = @[_refreshButton, _copyButton, _profileButton, _historyButton, _notificationButton, _settingsButton, _showCardButton, _quitButton];
-    BOOL dark = AppAppearanceIsDark();
     for (NSButton *button in buttons) {
-        NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(button.frame, 1, 1) xRadius:12 yRadius:12];
         BOOL activeNotification = button == _notificationButton && self.notificationsEnabled;
         BOOL destructive = button == _quitButton;
-        CGFloat fillAlpha = dark
-            ? (activeNotification || destructive ? 0.120 : (button.enabled ? 0.030 : 0.014))
-            : (activeNotification || destructive ? 0.105 : (button.enabled ? 0.045 : 0.024));
-        CGFloat strokeAlpha = dark
-            ? (activeNotification || destructive ? 0.145 : (button.enabled ? 0.070 : 0.032))
-            : (activeNotification || destructive ? 0.17 : (button.enabled ? 0.115 : 0.052));
-        NSColor *fillColor = activeNotification
-            ? NSColor.controlAccentColor
-            : (destructive ? NSColor.systemRedColor : (dark ? [NSColor colorWithCalibratedRed:0.06 green:0.07 blue:0.09 alpha:1.0] : NSColor.controlBackgroundColor));
-        [[fillColor colorWithAlphaComponent:fillAlpha] setFill];
-        [path fill];
-        [[[NSColor separatorColor] colorWithAlphaComponent:strokeAlpha] setStroke];
-        path.lineWidth = 0.7;
-        [path stroke];
-        if (button.enabled) {
-            DrawLiquidGlassControlWell(NSInsetRect(button.frame, 1.5, 1.5),
-                                       12,
-                                       activeNotification ? NSColor.controlAccentColor : (destructive ? NSColor.systemRedColor : NSColor.controlAccentColor),
-                                       self.appearanceMode,
-                                       activeNotification || destructive);
-        }
+        DrawStatusPopoverGlassControl(NSInsetRect(button.frame, 1.0, 1.0),
+                                      12,
+                                      activeNotification ? NSColor.controlAccentColor : (destructive ? NSColor.systemRedColor : NSColor.controlAccentColor),
+                                      self.appearanceMode,
+                                      activeNotification || destructive);
     }
 }
 
 - (void)drawQuickControlBackplates {
-    BOOL dark = AppAppearanceIsDark();
     NSArray<NSValue *> *baseRects = @[
         [NSValue valueWithRect:NSInsetRect(_appearanceControl.frame, -4, -4)],
         [NSValue valueWithRect:NSInsetRect(_statusDisplayControl.frame, -4, -4)],
@@ -2723,7 +3033,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         [NSValue valueWithRect:NSInsetRect(_menuBarOnlyButton.frame, -4, -3)]
     ];
     for (NSValue *value in baseRects) {
-        DrawLiquidGlassControlWell(value.rectValue, 11, NSColor.controlAccentColor, self.appearanceMode, NO);
+        DrawStatusPopoverGlassControl(value.rectValue, 11, NSColor.controlAccentColor, self.appearanceMode, NO);
     }
 
     NSMutableArray<NSValue *> *activeRects = [NSMutableArray new];
@@ -2737,10 +3047,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         [activeRects addObject:[NSValue valueWithRect:NSInsetRect(_menuBarOnlyButton.frame, -4, -3)]];
     }
     for (NSValue *value in activeRects) {
-        NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:value.rectValue xRadius:11 yRadius:11];
-        [[[NSColor controlAccentColor] colorWithAlphaComponent:dark ? 0.120 : 0.085] setFill];
-        [path fill];
-        DrawLiquidGlassRim(value.rectValue, 11, NSColor.controlAccentColor, dark ? 0.58 : 0.50);
+        DrawStatusPopoverGlassControl(value.rectValue, 11, NSColor.controlAccentColor, self.appearanceMode, YES);
     }
 }
 
@@ -2816,6 +3123,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 - (BOOL)bundlePathIsInstalledApplication:(NSString *)path;
 - (void)showCardWindowTemporarily;
 - (void)saveWindowFrameIfAvailable;
+- (void)applyRuntimeApplicationIcon;
 - (void)copyHistoryCSV;
 - (void)copyTrendCSV;
 - (void)copyHistoryPoints:(NSArray<NSDictionary *> *)points status:(NSString *)status;
@@ -2897,6 +3205,19 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     BOOL _historyHasDelta;
 }
 
+- (void)applyRuntimeApplicationIcon {
+    NSImage *icon = [NSImage imageNamed:@"AppIcon"];
+    if (!icon) {
+        NSString *iconPath = [NSBundle.mainBundle pathForResource:@"AppIcon" ofType:@"icns"];
+        if (iconPath.length > 0) {
+            icon = [[NSImage alloc] initWithContentsOfFile:iconPath];
+        }
+    }
+    if (icon) {
+        NSApp.applicationIconImage = icon;
+    }
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     if (![self prepareForSingleInstanceLaunch]) {
         return;
@@ -2911,12 +3232,14 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
                                                            name:NSWorkspaceAccessibilityDisplayOptionsDidChangeNotification
                                                          object:nil];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    [self applyRuntimeApplicationIcon];
     [self setupMainMenu];
     NSRect visible = NSScreen.mainScreen.visibleFrame;
     NSRect frame = NSMakeRect(NSMidX(visible) - MainWindowWidth / 2.0, NSMidY(visible) - MainWindowHeight / 2.0, MainWindowWidth, MainWindowHeight);
     frame.origin = [Settings windowOriginWithDefaultFrame:frame];
 
     _rootView = [[NSVisualEffectView alloc] initWithFrame:NSMakeRect(0, 0, MainWindowWidth, MainWindowHeight)];
+    _rootView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     _rootView.wantsLayer = YES;
     ((NSVisualEffectView *)_rootView).material = NSVisualEffectMaterialWindowBackground;
     ((NSVisualEffectView *)_rootView).blendingMode = NSVisualEffectBlendingModeBehindWindow;
@@ -2970,8 +3293,8 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     _window.title = @"BILI粉丝数";
     _window.titleVisibility = NSWindowTitleHidden;
     _window.opaque = NO;
-    _window.backgroundColor = NSColor.windowBackgroundColor;
-    _window.titlebarAppearsTransparent = NO;
+    _window.backgroundColor = WindowChromeBackgroundColor();
+    _window.titlebarAppearsTransparent = YES;
     _window.hasShadow = YES;
     _window.releasedWhenClosed = NO;
     _window.delegate = self;
@@ -3561,6 +3884,9 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 }
 
 - (NSVisualEffectMaterial)popoverMaterialForAppearance:(NSInteger)mode {
+    if (AppAppearanceIsDark()) {
+        return NSVisualEffectMaterialHUDWindow;
+    }
     mode = EffectiveAppearanceMode(mode);
     if (mode == AppearanceModeReadable) {
         return NSVisualEffectMaterialWindowBackground;
@@ -3574,6 +3900,14 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 - (void)applyVisualEffectMaterials {
     NSInteger mode = [Settings appearanceMode];
     NSInteger effectiveMode = EffectiveAppearanceMode(mode);
+    if (_window) {
+        _window.backgroundColor = WindowChromeBackgroundColor();
+        _window.titlebarAppearsTransparent = YES;
+    }
+    if (_preferencesWindow) {
+        _preferencesWindow.backgroundColor = WindowChromeBackgroundColor();
+        _preferencesWindow.titlebarAppearsTransparent = YES;
+    }
     if (_glassEffectView) {
         _glassEffectView.material = [self cardMaterialForAppearance:mode];
         _glassEffectView.state = NSVisualEffectStateActive;
@@ -3589,6 +3923,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         _preferencesEffectView.state = NSVisualEffectStateActive;
         _preferencesEffectView.alphaValue = 1.0;
     }
+    [self updateStatusItemTitleSyncVisibleSurfaces:NO];
 }
 
 - (void)setupStatusItem {
@@ -3598,6 +3933,8 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     _statusItem.button.imageScaling = NSImageScaleProportionallyDown;
     _statusItem.button.font = [NSFont monospacedDigitSystemFontOfSize:12 weight:NSFontWeightSemibold];
     _statusItem.button.title = @"";
+    _statusItem.button.bordered = NO;
+    _statusItem.button.wantsLayer = YES;
     _statusItem.button.toolTip = @"BILI粉丝数";
     _statusItem.button.target = self;
     _statusItem.button.action = @selector(statusItemClicked:);
@@ -3708,6 +4045,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     }
     [self syncStatusPopover];
     [_statusPopover showRelativeToRect:_statusItem.button.bounds ofView:_statusItem.button preferredEdge:NSRectEdgeMinY];
+    [self updateStatusItemTitleSyncVisibleSurfaces:NO];
     [self syncMainStatusWidgetButton];
     [self syncDisplayRefreshTickerForVisibleSurfaces];
 }
@@ -3716,29 +4054,22 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     if (_statusPopover.shown) {
         [_statusPopover close];
     }
+    [self updateStatusItemTitleSyncVisibleSurfaces:NO];
     [self syncDisplayRefreshTickerForVisibleSurfaces];
 }
 
 - (void)popoverDidClose:(NSNotification *)notification {
+    [self updateStatusItemTitleSyncVisibleSurfaces:NO];
     [self syncMainStatusWidgetButton];
     [self syncDisplayRefreshTickerForVisibleSurfaces];
 }
 
 - (NSImage *)statusBarWidgetIconActive:(BOOL)active {
-    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(21, 18)];
+    (void)active;
+    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(18, 18)];
     image.template = YES;
     [image lockFocus];
-
-    NSRect body = NSMakeRect(3.0, 3.0, 15.0, 12.0);
-    NSBezierPath *shape = [NSBezierPath bezierPathWithRoundedRect:body xRadius:4.2 yRadius:4.2];
-    shape.lineWidth = active ? 1.65 : 1.35;
-    [[NSColor.blackColor colorWithAlphaComponent:active ? 0.96 : 0.76] setStroke];
-    [shape stroke];
-
-    DrawCompactBMark(NSMakeRect(6.2, 5.1, 8.4, 8.4),
-                     [NSColor.blackColor colorWithAlphaComponent:active ? 0.96 : 0.76],
-                     active ? 1.32 : 1.16);
-
+    DrawBilibiliBLetter(NSMakeRect(1.0, 2.0, 16.0, 14.2), [NSColor.blackColor colorWithAlphaComponent:0.95]);
     [image unlockFocus];
     return image;
 }
@@ -3797,16 +4128,10 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 
 - (void)updateStatusItemTitleSyncVisibleSurfaces:(BOOL)syncVisibleSurfaces {
     if (!_statusItem.button) return;
-    BOOL iconActive = _isRefreshing || (_card.hasFollowers && [Settings autoRefreshEnabled]);
-    if (!_hasLastStatusIconState || _lastStatusIconActive != iconActive) {
-        _statusItem.button.image = [self cachedStatusBarWidgetIconActive:iconActive];
-        _lastStatusIconActive = iconActive;
-        _hasLastStatusIconState = YES;
-    }
-
+    BOOL iconActive = _statusPopover.shown || _isRefreshing || (_card.hasFollowers && [Settings autoRefreshEnabled]);
     NSInteger displayMode = [Settings statusDisplayMode];
-    CGFloat length = 28;
-    NSString *title = @"";
+    CGFloat length = 30;
+    NSString *imageText = @"";
     NSString *tooltip = nil;
     if (!_card.hasFollowers) {
         NSString *mode = [self refreshScheduleText];
@@ -3818,7 +4143,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         tooltip = mode.length > 0
             ? [NSString stringWithFormat:@"BILI粉丝数 · %@ · %@ · 左键小组件 · 右键菜单", target, mode]
             : [NSString stringWithFormat:@"BILI粉丝数 · %@ · 左键小组件 · 右键菜单", target];
-        [self applyStatusItemLength:length title:title tooltip:tooltip];
+        [self applyStatusItemLength:length imageText:imageText active:iconActive tooltip:tooltip];
         if (syncVisibleSurfaces) {
             [self syncStatusPopoverIfVisible];
             [self syncMainPageControlsIfVisible];
@@ -3829,12 +4154,13 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     NSString *name = _card.name.length > 0 ? _card.name : @"BILI粉丝数";
     NSString *updated = _card.updatedText.length > 0 ? _card.updatedText : @"等待刷新";
     if (displayMode == StatusDisplayModeIconOnly) {
-        length = 28;
-        title = @"";
+        length = 22;
+        imageText = @"";
     } else {
-        NSString *titleFollowers = displayMode == StatusDisplayModeCompact ? [self compactFollowersText] : followers;
-        length = NSVariableStatusItemLength;
-        title = [NSString stringWithFormat:@" %@", titleFollowers];
+        imageText = displayMode == StatusDisplayModeCompact ? [self compactFollowersText] : followers;
+        NSDictionary *attrs = @{NSFontAttributeName: [NSFont monospacedDigitSystemFontOfSize:12 weight:NSFontWeightSemibold]};
+        CGFloat textWidth = [imageText sizeWithAttributes:attrs].width;
+        length = MAX(48.0, ceil(26.0 + textWidth + 6.0));
     }
     NSString *mode = [Settings autoRefreshEnabled] ? [self refreshScheduleText] : @"已暂停";
     tooltip = [NSString stringWithFormat:@"%@ · %@ · %@ · %@ · %@ · 左键小组件 · 右键菜单",
@@ -3843,7 +4169,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
                updated,
                [self currentTrendSummaryText],
                mode.length > 0 ? mode : @"自动刷新"];
-    [self applyStatusItemLength:length title:title tooltip:tooltip];
+    [self applyStatusItemLength:length imageText:imageText active:iconActive tooltip:tooltip];
     if (syncVisibleSurfaces) {
         [self syncStatusPopoverIfVisible];
         [self syncMainPageControlsIfVisible];
@@ -3858,20 +4184,30 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         _popoverView.refreshScheduleText = scheduleText;
     }
     if (_window.isVisible && _mainScheduleLabel) {
-        _mainScheduleLabel.stringValue = [NSString stringWithFormat:@"自动刷新：%@", scheduleText.length > 0 ? scheduleText : @"等待计时"];
-        _mainScheduleLabel.textColor = [Settings autoRefreshEnabled] ? NSColor.secondaryLabelColor : NSColor.tertiaryLabelColor;
+        SetTextFieldStringIfChanged(_mainScheduleLabel,
+                                    [NSString stringWithFormat:@"自动刷新：%@", scheduleText.length > 0 ? scheduleText : @"等待计时"]);
+        SetTextFieldColorIfChanged(_mainScheduleLabel,
+                                   [Settings autoRefreshEnabled] ? NSColor.secondaryLabelColor : NSColor.tertiaryLabelColor);
     }
 }
 
-- (void)applyStatusItemLength:(CGFloat)length title:(NSString *)title tooltip:(NSString *)tooltip {
-    if (!_hasLastStatusLength || _lastStatusLength != length) {
-        _statusItem.length = length;
-        _lastStatusLength = length;
+- (void)applyStatusItemLength:(CGFloat)length imageText:(NSString *)imageText active:(BOOL)active tooltip:(NSString *)tooltip {
+    (void)length;
+    CGFloat effectiveLength = NSVariableStatusItemLength;
+    if (!_hasLastStatusLength || _lastStatusLength != effectiveLength) {
+        _statusItem.length = effectiveLength;
+        _lastStatusLength = effectiveLength;
         _hasLastStatusLength = YES;
     }
+    NSString *title = imageText.length > 0 ? [@" " stringByAppendingString:imageText] : @"";
     if (![_lastStatusTitle isEqualToString:title]) {
         _statusItem.button.title = title;
         _lastStatusTitle = [title copy];
+    }
+    if (!_hasLastStatusIconState || _lastStatusIconActive != active || !_statusItem.button.image) {
+        _statusItem.button.image = [self cachedStatusBarWidgetIconActive:active];
+        _lastStatusIconActive = active;
+        _hasLastStatusIconState = YES;
     }
     if (![_lastStatusTooltip isEqualToString:tooltip]) {
         _statusItem.button.toolTip = tooltip;
@@ -4324,6 +4660,7 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     _chromeView.appearanceMode = [Settings appearanceMode];
     _preferencesChromeView.appearanceMode = [Settings appearanceMode];
     _card.appearanceMode = [Settings appearanceMode];
+    _popoverView.appearanceMode = [Settings appearanceMode];
     NSString *message = @"极清透";
     if (_card.appearanceMode == AppearanceModeReadable) {
         message = @"增强可读";
@@ -4574,12 +4911,12 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 }
 
 - (void)updateHistoryValues {
-    NSArray<NSDictionary *> *history = [Settings historyForCurrentTarget];
+    NSArray<NSDictionary *> *history = SortedUsableHistoryPoints([Settings historyForCurrentTarget]);
     [Settings backfillSegmentedHistoryCSVIfNeededForMID:[Settings mid] history:history];
     NSInteger trendRange = [Settings trendRange];
     NSTimeInterval cutoff = NSDate.date.timeIntervalSince1970 - [self trendIntervalForRange:trendRange];
     NSTimeInterval weekCutoff = NSDate.date.timeIntervalSince1970 - OneWeekInterval;
-    NSArray<NSDictionary *> *trendHistory = TrendHistoryIncludingBaseline(history, cutoff);
+    NSArray<NSDictionary *> *trendHistory = TrendHistoryIncludingBaselineFromSortedPoints(history, cutoff);
     _historyPointCount = history.count;
     _weekPointCount = HistoryPointCountAtOrAfterCutoff(history, weekCutoff);
     _trendPointCount = HistoryPointCountAtOrAfterCutoff(history, cutoff);
@@ -4591,9 +4928,9 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 }
 
 - (void)copyHistoryCSV {
-    NSArray<NSDictionary *> *history = [Settings historyForCurrentTarget];
+    NSArray<NSDictionary *> *history = SortedUsableHistoryPoints([Settings historyForCurrentTarget]);
     NSTimeInterval cutoff = NSDate.date.timeIntervalSince1970 - OneWeekInterval;
-    NSArray<NSDictionary *> *weekHistory = HistoryPointsAtOrAfterCutoff(history, cutoff);
+    NSArray<NSDictionary *> *weekHistory = HistoryPointsAtOrAfterCutoffFromSortedPoints(history, cutoff);
     if (weekHistory.count == 0) {
         [self showTransientCardStatus:@"近7天暂无历史"];
         return;
@@ -4603,9 +4940,9 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 }
 
 - (void)copyTrendCSV {
-    NSArray<NSDictionary *> *history = [Settings historyForCurrentTarget];
+    NSArray<NSDictionary *> *history = SortedUsableHistoryPoints([Settings historyForCurrentTarget]);
     NSTimeInterval cutoff = NSDate.date.timeIntervalSince1970 - [self trendIntervalForRange:[Settings trendRange]];
-    NSArray<NSDictionary *> *trendHistory = TrendHistoryIncludingBaseline(history, cutoff);
+    NSArray<NSDictionary *> *trendHistory = TrendHistoryIncludingBaselineFromSortedPoints(history, cutoff);
     if (trendHistory.count == 0) {
         [self showTransientCardStatus:@"暂无趋势"];
         return;
@@ -4697,27 +5034,29 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
 - (void)syncMainPageControls {
     if (!_mainUIDField) return;
     if (![self textFieldIsBeingEdited:_mainUIDField]) {
-        _mainUIDField.stringValue = [NSString stringWithFormat:@"%lld", [Settings mid]];
+        SetTextFieldStringIfChanged(_mainUIDField, [NSString stringWithFormat:@"%lld", [Settings mid]]);
     }
 
     NSString *name = _card.name.length > 0 ? _card.name : [Settings name];
     if (name.length == 0) {
         name = UnknownTargetName;
     }
-    _mainTargetLabel.stringValue = [NSString stringWithFormat:@"当前监控：%@", name];
+    SetTextFieldStringIfChanged(_mainTargetLabel, [NSString stringWithFormat:@"当前监控：%@", name]);
     if (_card.hasFollowers) {
         NSString *followers = DecimalStringForInteger(_card.followers);
         NSString *updated = _card.updatedText.length > 0 ? _card.updatedText : @"--";
         NSString *status = _card.status.length > 0 ? _card.status : @"实时统计";
-        _mainStatusLabel.stringValue = [NSString stringWithFormat:@"%@ · %@ · %@", followers, status, updated];
-        _mainStatusLabel.textColor = NSColor.secondaryLabelColor;
+        SetTextFieldStringIfChanged(_mainStatusLabel, [NSString stringWithFormat:@"%@ · %@ · %@", followers, status, updated]);
+        SetTextFieldColorIfChanged(_mainStatusLabel, NSColor.secondaryLabelColor);
     } else {
-        _mainStatusLabel.stringValue = _card.status.length > 0 ? _card.status : @"等待刷新";
-        _mainStatusLabel.textColor = NSColor.secondaryLabelColor;
+        SetTextFieldStringIfChanged(_mainStatusLabel, _card.status.length > 0 ? _card.status : @"等待刷新");
+        SetTextFieldColorIfChanged(_mainStatusLabel, NSColor.secondaryLabelColor);
     }
     NSString *scheduleText = [self refreshScheduleText];
-    _mainScheduleLabel.stringValue = [NSString stringWithFormat:@"自动刷新：%@", scheduleText.length > 0 ? scheduleText : @"等待计时"];
-    _mainScheduleLabel.textColor = [Settings autoRefreshEnabled] ? NSColor.secondaryLabelColor : NSColor.tertiaryLabelColor;
+    SetTextFieldStringIfChanged(_mainScheduleLabel,
+                                [NSString stringWithFormat:@"自动刷新：%@", scheduleText.length > 0 ? scheduleText : @"等待计时"]);
+    SetTextFieldColorIfChanged(_mainScheduleLabel,
+                               [Settings autoRefreshEnabled] ? NSColor.secondaryLabelColor : NSColor.tertiaryLabelColor);
 
     NSInteger appearance = [Settings appearanceMode];
     _mainAppearanceControl.selectedSegment = appearance == AppearanceModeReadable
@@ -4760,32 +5099,34 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     if (_mainHistoryLabel) {
         if (_historyHasDelta) {
             NSString *deltaText = CompactSignedDelta(_historyDelta);
-            _mainHistoryLabel.stringValue = [NSString stringWithFormat:@"%@趋势 · %lu点 · %@", [self trendRangeTitle], (unsigned long)_trendPointCount, deltaText];
-            _mainHistoryLabel.textColor = FollowerDeltaColor(_historyDelta);
+            SetTextFieldStringIfChanged(_mainHistoryLabel,
+                                        [NSString stringWithFormat:@"%@趋势 · %lu点 · %@", [self trendRangeTitle], (unsigned long)_trendPointCount, deltaText]);
+            SetTextFieldColorIfChanged(_mainHistoryLabel, FollowerDeltaColor(_historyDelta));
         } else if (_historyPointCount > 0) {
-            _mainHistoryLabel.stringValue = [NSString stringWithFormat:@"%@趋势 · 数据继续积累中", [self trendRangeTitle]];
-            _mainHistoryLabel.textColor = NSColor.secondaryLabelColor;
+            SetTextFieldStringIfChanged(_mainHistoryLabel, [NSString stringWithFormat:@"%@趋势 · 数据继续积累中", [self trendRangeTitle]]);
+            SetTextFieldColorIfChanged(_mainHistoryLabel, NSColor.secondaryLabelColor);
         } else {
-            _mainHistoryLabel.stringValue = @"暂无历史点，刷新成功后自动记录。";
-            _mainHistoryLabel.textColor = NSColor.tertiaryLabelColor;
+            SetTextFieldStringIfChanged(_mainHistoryLabel, @"暂无历史点，刷新成功后自动记录。");
+            SetTextFieldColorIfChanged(_mainHistoryLabel, NSColor.tertiaryLabelColor);
         }
     }
     [self setButton:_mainRefreshButton enabled:!_isRefreshing];
-    _mainRefreshButton.title = _isRefreshing ? @"刷新中" : @"刷新";
-    _mainRefreshButton.toolTip = _isRefreshing ? @"正在刷新当前账号" : @"立即刷新当前账号";
+    SetButtonTitleIfChanged(_mainRefreshButton, _isRefreshing ? @"刷新中" : @"刷新");
+    SetViewToolTipIfChanged(_mainRefreshButton, _isRefreshing ? @"正在刷新当前账号" : @"立即刷新当前账号");
     [self setButton:_mainCopyButton enabled:_card.hasFollowers];
-    _mainCopyButton.toolTip = _card.hasFollowers ? @"复制当前粉丝数" : @"刷新成功后可复制粉丝数";
+    SetViewToolTipIfChanged(_mainCopyButton, _card.hasFollowers ? @"复制当前粉丝数" : @"刷新成功后可复制粉丝数");
     [self setButton:_mainProfileButton enabled:_card.mid > 0];
-    _mainProfileButton.toolTip = _card.mid > 0 ? @"打开当前 B站主页" : @"UID 有效后可打开主页";
+    SetViewToolTipIfChanged(_mainProfileButton, _card.mid > 0 ? @"打开当前 B站主页" : @"UID 有效后可打开主页");
     [self setButton:_mainCopyHistoryButton enabled:hasWeekHistory];
-    _mainCopyHistoryButton.toolTip = hasWeekHistory ? @"复制当前账号近 7 天 CSV" : @"近 7 天暂无可复制历史";
+    SetViewToolTipIfChanged(_mainCopyHistoryButton, hasWeekHistory ? @"复制当前账号近 7 天 CSV" : @"近 7 天暂无可复制历史");
     BOOL hasTrend = _trendPointCount > 0;
     [self setButton:_mainCopyTrendButton enabled:hasTrend];
-    _mainCopyTrendButton.toolTip = hasTrend
-        ? [NSString stringWithFormat:@"复制%@趋势 CSV（含基线点）", [self trendRangeTitle]]
-        : [NSString stringWithFormat:@"%@趋势数据继续积累中", [self trendRangeTitle]];
+    SetViewToolTipIfChanged(_mainCopyTrendButton,
+                            hasTrend
+                                ? [NSString stringWithFormat:@"复制%@趋势 CSV（含基线点）", [self trendRangeTitle]]
+                                : [NSString stringWithFormat:@"%@趋势数据继续积累中", [self trendRangeTitle]]);
     [self setButton:_mainClearHistoryButton enabled:hasHistory];
-    _mainClearHistoryButton.toolTip = hasHistory ? @"清空当前账号历史" : @"暂无可清空的历史";
+    SetViewToolTipIfChanged(_mainClearHistoryButton, hasHistory ? @"清空当前账号历史" : @"暂无可清空的历史");
 }
 
 - (long long)validatedMIDFromField:(NSTextField *)field statusTarget:(void (^)(NSString *message, BOOL error))statusTarget {
@@ -4980,8 +5321,8 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
     _preferencesWindow.releasedWhenClosed = NO;
     _preferencesWindow.level = NSNormalWindowLevel;
     _preferencesWindow.opaque = NO;
-    _preferencesWindow.backgroundColor = NSColor.windowBackgroundColor;
-    _preferencesWindow.titlebarAppearsTransparent = NO;
+    _preferencesWindow.backgroundColor = WindowChromeBackgroundColor();
+    _preferencesWindow.titlebarAppearsTransparent = YES;
 
     NSVisualEffectView *root = [[NSVisualEffectView alloc] initWithFrame:frame];
     root.material = NSVisualEffectMaterialWindowBackground;
@@ -5414,11 +5755,12 @@ static NSArray<NSDictionary *> *sCachedHistoryForMID = nil;
         return [NSString stringWithFormat:@"昨天 %@ 更新", timeText];
     }
 
-    NSDateFormatter *dateFormatter = [NSDateFormatter new];
-    dateFormatter.locale = [NSLocale localeWithLocaleIdentifier:@"zh_CN"];
     NSDateComponents *now = [calendar components:NSCalendarUnitYear fromDate:[NSDate date]];
     NSDateComponents *then = [calendar components:NSCalendarUnitYear fromDate:date];
-    dateFormatter.dateFormat = now.year == then.year ? @"M月d日 HH:mm" : @"yyyy年M月d日 HH:mm";
+    NSString *format = now.year == then.year ? @"M月d日 HH:mm" : @"yyyy年M月d日 HH:mm";
+    NSDateFormatter *dateFormatter = ThreadLocalDateFormatterWithLocale([@"BILIFansUpdatedDisplayFormatter." stringByAppendingString:format],
+                                                                        format,
+                                                                        @"zh_CN");
     return [NSString stringWithFormat:@"%@ 更新", [dateFormatter stringFromDate:date] ?: timeText];
 }
 
