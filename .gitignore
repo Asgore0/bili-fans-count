@@ -34,3 +34,4 @@ macos-card-special/
 *.log
 *.tmp
 *.bak
+work/*.iconset/
