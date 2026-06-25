@@ -1,9 +1,6 @@
 #define main BILIFansCardAppMain
-// Import the app translation unit so tests can cover internal static helpers
-// across the domain-split source parts without exporting them as public API.
 #import "../src/BILIFansCard.m"
 #undef main
-#include <stdlib.h>
 
 static void AssertMID(NSString *input, long long expected) {
     long long actual = BilibiliMIDFromInput(input);
@@ -13,12 +10,8 @@ static void AssertMID(NSString *input, long long expected) {
     }
 }
 
-static NSDictionary *HistoryPointForMID(long long mid, NSTimeInterval updatedAt, NSInteger followers) {
-    return @{@"updated_at": @(updatedAt), @"followers": @(followers), @"mid": @(mid)};
-}
-
 static NSDictionary *HistoryPoint(NSTimeInterval updatedAt, NSInteger followers) {
-    return HistoryPointForMID(3546718146661176LL, updatedAt, followers);
+    return @{@"updated_at": @(updatedAt), @"followers": @(followers), @"mid": @3546718146661176LL};
 }
 
 static void AssertTrendFollowers(NSArray<NSDictionary *> *history, NSTimeInterval cutoff, const NSInteger *expected, NSUInteger expectedCount) {
@@ -44,14 +37,6 @@ static void AssertTrendCount(NSArray<NSDictionary *> *history, NSTimeInterval cu
     }
 }
 
-static void AssertSortedTrendCount(NSArray<NSDictionary *> *history, NSTimeInterval cutoff, NSUInteger expected) {
-    NSUInteger actual = HistoryPointCountAtOrAfterCutoffFromSortedUsablePoints(SortedUsableHistoryPoints(history), cutoff);
-    if (actual != expected) {
-        fprintf(stderr, "Expected %lu sorted in-range points, got %lu\n", (unsigned long)expected, (unsigned long)actual);
-        abort();
-    }
-}
-
 static void AssertFilteredHistoryCount(NSArray<NSDictionary *> *history, NSTimeInterval cutoff, NSUInteger expected) {
     NSArray<NSDictionary *> *actual = HistoryPointsAtOrAfterCutoff(history, cutoff);
     if (actual.count != expected) {
@@ -69,19 +54,6 @@ static void AssertBiliError(NSDictionary *root, NSString *fallback, NSInteger fa
                 expectedDescription.UTF8String,
                 (long)error.code,
                 error.localizedDescription.UTF8String);
-        abort();
-    }
-}
-
-static void AssertTransientRequestError(NSError *error, BOOL expected) {
-    BOOL actual = [BiliFansClient isTransientRequestError:error];
-    if (actual != expected) {
-        fprintf(stderr,
-                "Expected transient=%d for %s/%ld, got %d\n",
-                expected,
-                error.domain.UTF8String,
-                (long)error.code,
-                actual);
         abort();
     }
 }
@@ -184,43 +156,6 @@ static void AssertRecentResultsFallback(void) {
     RestoreDefaults(keys, snapshot);
 }
 
-static void AssertSaveHistoryPrefillsCurrentCache(void) {
-    NSArray<NSString *> *keys = @[@"target_mid", @"history_points"];
-    NSDictionary<NSString *, id> *snapshot = SnapshotDefaults(keys);
-    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-    long long testMID = 987650000001LL;
-    NSString *temporaryRoot = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"bilifans-history-%@", NSUUID.UUID.UUIDString]];
-    BOOL ok = NO;
-    @try {
-        setenv("BILIFANSCARD_HISTORY_CSV_ROOT", temporaryRoot.fileSystemRepresentation, 1);
-        for (NSString *key in keys) {
-            [defaults removeObjectForKey:key];
-        }
-        [defaults setObject:@(testMID) forKey:@"target_mid"];
-        [Settings clearSegmentedHistoryCSVForMID:testMID];
-
-        FanResult *result = [FanResult new];
-        result.mid = testMID;
-        result.name = @"测试账号";
-        result.followers = 3456;
-        result.updatedAt = [NSDate dateWithTimeIntervalSince1970:2000];
-        [Settings saveHistoryPoint:result];
-
-        [defaults setObject:@[] forKey:@"history_points"];
-        NSArray<NSDictionary *> *cached = [Settings historyForCurrentTarget];
-        ok = cached.count == 1 && [cached.firstObject[@"followers"] integerValue] == 3456;
-    } @finally {
-        RestoreDefaults(keys, snapshot);
-        [Settings clearSegmentedHistoryCSVForMID:testMID];
-        [NSFileManager.defaultManager removeItemAtPath:temporaryRoot error:nil];
-        unsetenv("BILIFANSCARD_HISTORY_CSV_ROOT");
-    }
-    if (!ok) {
-        fprintf(stderr, "Expected saveHistoryPoint to prefill the current history cache\n");
-        abort();
-    }
-}
-
 int main(int argc, const char * argv[]) {
     (void)argc;
     (void)argv;
@@ -244,14 +179,7 @@ int main(int argc, const char * argv[]) {
         ];
         NSInteger withBaseline[] = {9, 10, 12, 14};
         AssertTrendFollowers(history, 1000, withBaseline, 4);
-        NSArray<NSDictionary *> *sortedHistory = SortedUsableHistoryPoints(history);
-        NSArray<NSDictionary *> *sortedTrend = TrendHistoryIncludingBaselineFromSortedPoints(sortedHistory, 1000);
-        if (sortedTrend.count != 4 || [sortedTrend.firstObject[@"followers"] integerValue] != 9) {
-            fprintf(stderr, "Expected sorted trend slicing to include the immediate baseline point\n");
-            abort();
-        }
         AssertTrendCount(history, 1000, 3);
-        AssertSortedTrendCount(history, 1000, 3);
 
         NSArray<NSDictionary *> *noPreviousHistory = @[
             HistoryPoint(1400, 14),
@@ -266,15 +194,9 @@ int main(int argc, const char * argv[]) {
         AssertTrendFollowers(history, 1005, exactCutoff, 3);
         AssertTrendCount(history, 1005, 3);
         AssertFilteredHistoryCount(history, 1005, 3);
-        NSArray<NSDictionary *> *sortedFiltered = HistoryPointsAtOrAfterCutoffFromSortedPoints(sortedHistory, 1005);
-        if (sortedFiltered.count != 3 || [sortedFiltered.firstObject[@"followers"] integerValue] != 10) {
-            fprintf(stderr, "Expected sorted cutoff filtering to return the range tail from the first matching point\n");
-            abort();
-        }
 
         AssertTrendFollowers(history, 1600, NULL, 0);
         AssertTrendCount(history, 1600, 0);
-        AssertSortedTrendCount(history, 1600, 0);
         AssertFilteredHistoryCount(history, 1600, 0);
 
         NSString *fullCSV = CSVStringForHistoryPoints(noPreviousHistory, NO, 0);
@@ -312,17 +234,8 @@ int main(int argc, const char * argv[]) {
                         9,
                         @"接口返回异常");
 
-        AssertTransientRequestError([NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorTimedOut userInfo:nil], YES);
-        AssertTransientRequestError([NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorNetworkConnectionLost userInfo:nil], YES);
-        AssertTransientRequestError([NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorBadURL userInfo:nil], NO);
-        AssertTransientRequestError([NSError errorWithDomain:@"BILIFansCard" code:BiliFansHTTPErrorCodeBase + 429 userInfo:nil], YES);
-        AssertTransientRequestError([NSError errorWithDomain:@"BILIFansCard" code:BiliFansHTTPErrorCodeBase + 503 userInfo:nil], YES);
-        AssertTransientRequestError([NSError errorWithDomain:@"BILIFansCard" code:BiliFansHTTPErrorCodeBase + 404 userInfo:nil], NO);
-        AssertTransientRequestError([NSError errorWithDomain:@"BILIFansCard" code:7 userInfo:nil], NO);
-
         AssertRecentResultsFallback();
         AssertHistoryDoesNotExpireAfterOneYear();
-        AssertSaveHistoryPrefillsCurrentCache();
     }
     return 0;
 }

@@ -20,8 +20,7 @@
 .
 ├── app/                         Android app and widgets
 ├── macos-card/                  Formal macOS app
-│   ├── src/BILIFansCard.m       Thin macOS app entry point
-│   ├── src/parts/               Domain-oriented AppKit implementation parts
+│   ├── src/BILIFansCard.m       Main AppKit implementation
 │   ├── tests/UIDParsingTest.m   macOS unit-style checks
 │   ├── package-macos.sh         Universal app + DMG packaging script
 │   └── BILIFansCard.app/        Source bundle metadata and icon
@@ -30,16 +29,6 @@
 ```
 
 `macos-card-special/` is intentionally treated as a local special edition and is not part of the formal GitHub source set.
-
-The macOS app is intentionally kept as one Objective-C translation unit so the
-lightweight tests can import the entry point and exercise internal static
-helpers. Implementation details live in `macos-card/src/parts/` by domain:
-
-- `BFCShared.inc`: constants, formatting, glass drawing, parsing, and history helpers.
-- `BFCSettings.inc`: defaults, latest-result cache, history cache, and CSV persistence.
-- `BFCBiliClient.inc`: Bilibili API requests and fallback behavior.
-- `BFCViews.inc`: liquid-glass card, dashboard, preferences, and menu-bar panel views.
-- `BFCAppDelegate.inc`: menus, windows, status item, refresh lifecycle, and commands.
 
 ## Requirements
 
@@ -60,7 +49,17 @@ helpers. Implementation details live in `macos-card/src/parts/` by domain:
 ### macOS Checks
 
 ```bash
-./macos-card/check-macos.sh
+clang -fobjc-arc -Wall -Wextra -Werror -fsyntax-only -mmacosx-version-min=12.0 macos-card/src/BILIFansCard.m
+
+clang -fobjc-arc -Wall -Wextra -Werror -mmacosx-version-min=12.0 \
+  -framework Cocoa \
+  -framework QuartzCore \
+  -framework UserNotifications \
+  -framework ServiceManagement \
+  macos-card/tests/UIDParsingTest.m \
+  -o /tmp/bilifans-uid-parse-test
+
+/tmp/bilifans-uid-parse-test
 ```
 
 ### macOS DMG
@@ -94,7 +93,7 @@ No server component is included in this project.
 
 ## Release Notes
 
-The latest packaged local release is `v4.87`. Generated DMGs and APKs are intentionally ignored by git; publish them as GitHub Release assets when needed.
+The latest packaged local release is `v4.16`. Generated DMGs and APKs are intentionally ignored by git; publish them as GitHub Release assets when needed.
 
 ## License
 
