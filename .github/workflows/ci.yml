@@ -12,20 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Syntax check
-        run: |
-          clang -fobjc-arc -Wall -Wextra -Werror -fsyntax-only -mmacosx-version-min=12.0 macos-card/src/BILIFansCard.m
-
-      - name: Unit checks
-        run: |
-          clang -fobjc-arc -Wall -Wextra -Werror -mmacosx-version-min=12.0 \
-            -framework Cocoa \
-            -framework QuartzCore \
-            -framework UserNotifications \
-            -framework ServiceManagement \
-            macos-card/tests/UIDParsingTest.m \
-            -o /tmp/bilifans-uid-parse-test
-          /tmp/bilifans-uid-parse-test
+      - name: macOS checks
+        run: ./macos-card/check-macos.sh
 
   android:
     name: Android
